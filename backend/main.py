@@ -20,8 +20,11 @@ async def websocket_endpoint(websocket: WebSocket):
     print ("client connected")
     try:
         while True: #keep connect
-            data = await websocket.receive_text() #await for frontend to send data
-            print("received:",data)
-            await websocket.send_text(f"Echo: {data}") #send back received msg
+            data = await websocket.receive() #await for frontend to send data
+            if "bytes" in data: #audio bytes from frontend
+                audio_bytes = data["bytes"]
+                print("received audio chunk:", len(audio_bytes), "bytes")
+            elif "text" in data: #text from frontend
+                print("received text:", data["text"])
     except Exception as e:
         print("connection closed", e)
