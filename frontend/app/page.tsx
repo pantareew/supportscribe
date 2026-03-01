@@ -6,6 +6,7 @@ export default function Home() {
   const [socket, setSocket] = useState<WebSocket | null>(null); //websocket connection instance
   const [recording, setRecording] = useState(false); //show start or end button
   const mediaRecordRef = useRef<MediaRecorder | null>(null); //stores media recorder
+  const [transcript, setTranscript] = useState<string>(""); //transcribed text
 
   useEffect(() => {
     const ws = new WebSocket("ws://localhost:8000/ws"); //connect to fastapi websocket endpoint
@@ -13,8 +14,13 @@ export default function Home() {
     ws.onopen = () => {
       console.log("Connected to backend");
     };
-    setSocket(ws); //set ws for sending data to backend
 
+    //receive data from backend
+    ws.onmessage = (event) => {
+      setTranscript((prev) => prev + " " + event.data);
+    };
+
+    setSocket(ws); //set ws for sending data to backend
     return () => {
       ws.close(); //close connection when page refreshes
     };
@@ -56,6 +62,11 @@ export default function Home() {
       ) : (
         <button onClick={stopRecording}>End Call</button>
       )}
+      {/*transcript */}
+      <div style={{ marginTop: 20 }}>
+        <h2>Live Transcript:</h2>
+        <p>{transcript}</p>
+      </div>
     </div>
   );
 }
