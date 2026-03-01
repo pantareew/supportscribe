@@ -1,6 +1,14 @@
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from openai import OpenAI
+import os
+import io
+import asyncio
+
 app = FastAPI()
+
+ai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 #frontend connection
 app.add_middleware(
     CORSMiddleware,
@@ -9,11 +17,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 #test backend connection
 @app.get("/")
 async def root():
     return {"status": "SupportScribe backend running"}
 
+#transcribe audio byte to text
+async def transcribe_audio(audio_bytes: bytes) -> str: #returning a string (transcribed text)
+    audio_file = io.BytesIO(audio_bytes) #convert bytes into file to send to ai
+    transcript = await asyncio.to_thread( #run the function in separate thread so it doesn't block async ws loop
+        ai.audio.transcriptions.create, #ai creates speech to text
+        model="whisper-1", #use OpenAI Whisper
+        file=audio_file 
+    )
+    return transcript.text
 #websocket connection
 @app.websocket("/ws") #websocket endpoint
 async def websocket_endpoint(websocket: WebSocket):
