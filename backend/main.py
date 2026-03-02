@@ -35,21 +35,25 @@ async def transcribe_audio(audio_bytes: bytes) -> str: #returning a string (tran
         model="whisper-1", #use OpenAI Whisper
         file=audio_file 
     )
-    print("Transcript:", transcript.text)
     return transcript.text
 #websocket connection
 @app.websocket("/ws") #websocket endpoint
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept() #server accept connection
     audio_chunk = bytearray() #array to hold audio data
+    webm_header = None #to store frist chunk header
     try:
         while True: #while connected
             data = await websocket.receive_bytes() #await for frontend to send data
+            #extract header from first chunk
+            if webm_header is None:
+                webm_header = data[:2000] #first 2 kb contains headers 
             audio_chunk.extend(data) #add received data to array
             print("Chunk size:", len(audio_chunk))
-            if len(audio_chunk) > 200_000: #receive enough data (200_000 bytes)
+            if len(audio_chunk) > 200_000: #receive enough data to transcribe (200_000 bytes)
                 try:
-                    text = await transcribe_audio(audio_chunk) #call whisper to get convert bytes to text
+                    chunk_to_transcribe = webm_header + audio_chunk #add header to audio chunk to prevent type error
+                    text = await transcribe_audio(chunk_to_transcribe) #call whisper to get convert bytes to text
                     await websocket.send_text(text) #send transcribed text back to frontend
                 except Exception as e:
                     await websocket.send_text(f"[Error transcribing: {e}]")
