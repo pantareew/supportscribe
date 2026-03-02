@@ -58,5 +58,15 @@ async def websocket_endpoint(websocket: WebSocket):
                 except Exception as e:
                     await websocket.send_text(f"[Error transcribing: {e}]")
                 audio_chunk.clear() #clear chunk array
+    #call is ended
     except Exception as e:
         print("connection closed", e)
+        #if there's leftover data
+        if audio_chunk and webm_header:
+            try: 
+                print("Printing last transcript")
+                final_chunk = webm_header + audio_chunk
+                text = await transcribe_audio(final_chunk)
+                await websocket.send_text(text)
+            except Exception as e:
+                print("Last transcript error:", e)
