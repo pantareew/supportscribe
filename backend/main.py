@@ -37,7 +37,7 @@ async def transcribe_audio(audio_bytes: bytes) -> str: #returning a string (tran
     )
     return transcript.text
 
-#send transcript to AI to generate summary
+#generate summary
 async def generate_summary(transcript: str) -> str: #return summary text
     #response return in structured format 
     response = await asyncio.to_thread(     #run function in separate thread so server wont freeze while waiting for ai
@@ -90,6 +90,21 @@ async def websocket_endpoint(websocket: WebSocket):
                 print("Printing last transcript")
                 final_chunk = webm_header + audio_chunk
                 text = await transcribe_audio(final_chunk)
-                await websocket.send_text(text)
+                full_transcript += " " + text #add transcript from leftover
+                try:
+                    await websocket.send_text(text) #send text to frontend
+                except:
+                    pass
             except Exception as e:
                 print("Last transcript error:", e)
+        #generate summary after got full transcript
+        if full_transcript.strip():
+            print("Generating summary...")
+            #send transcript to AI to generate summary
+            summary = await generate_summary(full_transcript)
+            try:
+                #send summary to frontend
+                await websocket.send_text("Summary:")
+                await websocket.send_text(summary)
+            except:
+                pass
