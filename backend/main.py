@@ -66,58 +66,63 @@ async def websocket_endpoint(websocket: WebSocket):
     audio_chunk = bytearray() #array to hold audio data
     webm_header = None #to store frist chunk header
     full_transcript = "" #full transcript for summary
-    try:
+    try:    
         while True: #while connected
-            data = await websocket.receive_bytes() #await for frontend to send data
-            #extract header from first chunk
-            if webm_header is None:
-                webm_header = data[:2000] #first 2 kb contains headers 
-            audio_chunk.extend(data) #add received data to array
-            print("Chunk size:", len(audio_chunk))
-            if len(audio_chunk) > 60_000: #receive enough data to transcribe
-                try:
-                    chunk_to_transcribe = webm_header + audio_chunk #add header to audio chunk to prevent type error
-                    text = await transcribe_audio(chunk_to_transcribe) #call whisper to get convert bytes to text
-                    full_transcript += " " + text #accumulate full transcript
-                    #send transcribed text back to frontend
-                    await websocket.send_json({
-                        "type": "transcript",
-                        "data": text
-                    }) 
-                except Exception as e:
-                    await websocket.send_json({
-                        "type": "error",
-                        "data": str(e)
-                    })
-                audio_chunk.clear() #clear chunk array
-    #call is ended
+            data = await websocket.receive() #await for frontend to send data
+            #receiving audio
+            if "bytes" in data:
+                chunk = data["bytes"] #get audio bytes
+                #extract header from first chunk
+                if webm_header is None:
+                    webm_header = chunk[:2000] #first 2 kb contains headers 
+                audio_chunk.extend(chunk) #add received data to array
+                print("Chunk size:", len(audio_chunk))
+                if len(audio_chunk) > 60_000: #receive enough data to transcribe
+                    try:
+                        chunk_to_transcribe = webm_header + audio_chunk #add header to audio chunk to prevent type error
+                        text = await transcribe_audio(chunk_to_transcribe) #call whisper to get convert bytes to text
+                        full_transcript += " " + text #accumulate full transcript
+                        #send transcribed text back to frontend
+                        await websocket.send_json({
+                            "type": "transcript",
+                            "data": text
+                        }) 
+                    except Exception as e:
+                        await websocket.send_json({
+                            "type": "error",
+                            "data": str(e)
+                        })
+                    audio_chunk.clear() #clear chunk array
+            #receiving stop signal
+            elif "text" in data and data["text"] == "STOP":
+                #if there's leftover chunk
+                if audio_chunk and webm_header:
+                    try: 
+                        print("Printing final transcript")
+                        final_chunk = webm_header + audio_chunk
+                        text = await transcribe_audio(final_chunk)
+                        full_transcript += " " + text #add transcript from leftover
+                        #send transcript to frontend
+                        await websocket.send_json({
+                                "type": "transcript",
+                                "data": text
+                            }) 
+                        
+                    except Exception as e:
+                        print("Final transcript error:", e)
+                #generate summary after got full transcript
+                if full_transcript.strip():
+                    print("Generating summary...")
+                    #send transcript to AI to generate summary
+                    summary = await generate_summary(full_transcript)
+                    try:
+                        #send summary to frontend
+                        await websocket.send_json({
+                            "type": "summary",
+                            "data": summary
+                        })
+                    except Exception as e:
+                        print("Summary error:", e)
+                break
     except Exception as e:
-        print("connection closed", e)
-        #if there's leftover chunk
-        if audio_chunk and webm_header:
-            try: 
-                print("Printing final transcript")
-                final_chunk = webm_header + audio_chunk
-                text = await transcribe_audio(final_chunk)
-                full_transcript += " " + text #add transcript from leftover
-                #send text to frontend
-                await websocket.send_json({
-                        "type": "transcript",
-                        "data": text
-                    }) 
-                
-            except Exception as e:
-                print("Final transcript error:", e)
-        #generate summary after got full transcript
-        if full_transcript.strip():
-            print("Generating summary...")
-            #send transcript to AI to generate summary
-            summary = await generate_summary(full_transcript)
-            try:
-                #send summary to frontend
-                await websocket.send_json({
-                    "type": "summary",
-                    "data": summary
-                })
-            except Exception as e:
-                print("Summary error:", e)
+        print("Connection error:", e)
