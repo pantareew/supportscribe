@@ -6,9 +6,8 @@ export default function Home() {
   const [socket, setSocket] = useState<WebSocket | null>(null); //websocket connection instance
   const [recording, setRecording] = useState(false); //show start or end button
   const mediaRecordRef = useRef<MediaRecorder | null>(null); //stores media recorder
-  const [transcript, setTranscript] = useState<string>(""); //transcribed text
-  const [isSummary, setIsSummary] = useState(false); //determine summary mode
-  const [summary, setSummary] = useState<string>(""); //summary text
+  const [transcript, setTranscript] = useState(""); //transcribed text
+  const [summary, setSummary] = useState(""); //summary text
   useEffect(() => {
     const ws = new WebSocket("ws://localhost:8000/ws"); //connect to fastapi websocket endpoint
     //connect successful
@@ -18,19 +17,20 @@ export default function Home() {
 
     //receive data from backend
     ws.onmessage = (event) => {
-      //detect summary marker
-      if (event.data === "---Summary---") {
-        setIsSummary(true); //turns to summary mode
-        return;
+      //parse json from backend
+      const msg = JSON.parse(event.data);
+      //detect text type
+      if (msg.type === "transcript") {
+        //text is trancript
+        setTranscript((prev) => prev + " " + msg.data);
       }
-      //
-      setTranscript((prev) => {
-        if (isSummary) return prev;
-        return prev + " " + event.data;
-      });
-      //handle summary text
-      if (isSummary) {
-        setSummary(event.data); //incoming msg data is summary
+      //text is summary
+      if (msg.type === "summary") {
+        setSummary(msg.data);
+      }
+      //error message
+      if (msg.type === "error") {
+        console.error(msg.data);
       }
     };
 
@@ -69,13 +69,14 @@ export default function Home() {
   };
   return (
     <div style={{ padding: 20 }}>
-      <h1>SupportScribe WebSocket Test</h1>
+      <h1>SupportScribe</h1>
       {/*recording */}
       {!recording ? (
         <button onClick={startRecording}>Start Call</button>
       ) : (
         <button onClick={stopRecording}>End Call</button>
       )}
+      <hr />
       {/*transcript */}
       <div style={{ marginTop: 20 }}>
         <h2>Live Transcript:</h2>

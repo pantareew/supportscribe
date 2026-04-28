@@ -79,9 +79,16 @@ async def websocket_endpoint(websocket: WebSocket):
                     chunk_to_transcribe = webm_header + audio_chunk #add header to audio chunk to prevent type error
                     text = await transcribe_audio(chunk_to_transcribe) #call whisper to get convert bytes to text
                     full_transcript += " " + text #accumulate full transcript
-                    await websocket.send_text(text) #send transcribed text back to frontend
+                    #send transcribed text back to frontend
+                    await websocket.send_json({
+                        "type": "transcript",
+                        "data": text
+                    }) 
                 except Exception as e:
-                    await websocket.send_text(f"[Error transcribing: {e}]")
+                    await websocket.send_json({
+                        "type": "error",
+                        "data": str(e)
+                    })
                 audio_chunk.clear() #clear chunk array
     #call is ended
     except Exception as e:
