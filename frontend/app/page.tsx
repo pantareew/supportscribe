@@ -77,11 +77,12 @@ export default function Home() {
         <button onClick={stopRecording}>End Call</button>
       )}
       <hr />
-      {/*transcript */}
-      <div style={{ marginTop: 20 }}>
-        <h2>Live Transcript:</h2>
-        <p>{transcript}</p>
-      </div>
+      {/*transcript text*/}
+      <h2>Live Transcript</h2>
+      <p>{transcript || "Listening..."}</p>
+      {/*summary text */}
+      <h2>Summary</h2>
+      <p>{summary || "No summary yet"}</p>
     </div>
   );
 }
