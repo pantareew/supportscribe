@@ -65,6 +65,10 @@ export default function Home() {
 
   const stopRecording = () => {
     mediaRecordRef.current?.stop(); //stop recording
+    //trigger backend that recording stop
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send("STOP");
+    }
     setRecording(false); //ui switch to start call btn
   };
   return (
@@ -79,10 +83,10 @@ export default function Home() {
       <hr />
       {/*transcript text*/}
       <h2>Live Transcript</h2>
-      <p>{transcript || "Listening..."}</p>
+      <p>{transcript}</p>
       {/*summary text */}
       <h2>Summary</h2>
-      <p>{summary || "No summary yet"}</p>
+      <p>{summary}</p>
     </div>
   );
 }
