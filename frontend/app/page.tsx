@@ -7,7 +7,8 @@ export default function Home() {
   const [recording, setRecording] = useState(false); //show start or end button
   const mediaRecordRef = useRef<MediaRecorder | null>(null); //stores media recorder
   const [transcript, setTranscript] = useState<string>(""); //transcribed text
-
+  const [isSummary, setIsSummary] = useState(false); //determine summary mode
+  const [summary, setSummary] = useState<string>(""); //summary text
   useEffect(() => {
     const ws = new WebSocket("ws://localhost:8000/ws"); //connect to fastapi websocket endpoint
     //connect successful
@@ -17,7 +18,20 @@ export default function Home() {
 
     //receive data from backend
     ws.onmessage = (event) => {
-      setTranscript((prev) => prev + " " + event.data);
+      //detect summary marker
+      if (event.data === "---Summary---") {
+        setIsSummary(true); //turns to summary mode
+        return;
+      }
+      //
+      setTranscript((prev) => {
+        if (isSummary) return prev;
+        return prev + " " + event.data;
+      });
+      //handle summary text
+      if (isSummary) {
+        setSummary(event.data); //incoming msg data is summary
+      }
     };
 
     setSocket(ws); //set ws for sending data to backend

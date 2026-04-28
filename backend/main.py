@@ -46,13 +46,15 @@ async def generate_summary(transcript: str) -> str: #return summary text
         #prompt
         input=f"""
         You are an AI assistant for IT service desk agents.
-        Given this support call transcript:
+        From the transcript below, extract:
+        - Customer Issue
+        - Troubleshooting Steps Taken
+        - Resolution Status (Resolved / Unresolved)
+        - Next Steps (if unresolved)
+
+        Transcript:
         {transcript}
-        Generate:
-        1. Issue Summary
-        2. Troubleshooting Steps Taken
-        3. Resolution Status
-        4. Next Steps (if unresolved)
+
         Keep it concise and structured.
         """
     ) 
@@ -84,19 +86,21 @@ async def websocket_endpoint(websocket: WebSocket):
     #call is ended
     except Exception as e:
         print("connection closed", e)
-        #if there's leftover data
+        #if there's leftover chunk
         if audio_chunk and webm_header:
             try: 
-                print("Printing last transcript")
+                print("Printing final transcript")
                 final_chunk = webm_header + audio_chunk
                 text = await transcribe_audio(final_chunk)
                 full_transcript += " " + text #add transcript from leftover
-                try:
-                    await websocket.send_text(text) #send text to frontend
-                except:
-                    pass
+                #send text to frontend
+                await websocket.send_json({
+                        "type": "transcript",
+                        "data": text
+                    }) 
+                
             except Exception as e:
-                print("Last transcript error:", e)
+                print("Final transcript error:", e)
         #generate summary after got full transcript
         if full_transcript.strip():
             print("Generating summary...")
@@ -104,7 +108,9 @@ async def websocket_endpoint(websocket: WebSocket):
             summary = await generate_summary(full_transcript)
             try:
                 #send summary to frontend
-                await websocket.send_text("Summary:")
-                await websocket.send_text(summary)
-            except:
-                pass
+                await websocket.send_json({
+                    "type": "summary",
+                    "data": summary
+                })
+            except Exception as e:
+                print("Summary error:", e)
